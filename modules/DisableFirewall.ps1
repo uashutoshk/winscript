@@ -88,7 +88,7 @@ function Get-FirewallTab {
 
         Write-Log "Applying Firewall policy: $Action" "Info"
 
-        Start-BackgroundTask -Work {
+        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
             param($SyncHash, $Action, $PolPath, $IsDryRun)
             try {
                 $result = Invoke-LgpoApply -Scope "Machine" -PolPath $PolPath -DryRun:$IsDryRun

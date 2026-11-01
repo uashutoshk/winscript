@@ -93,7 +93,7 @@ function Get-DenyUsbStorageTab {
 
         Write-Log "Applying USB Storage policy: $Action" "Info"
 
-        Start-BackgroundTask -Work {
+        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
             param($SyncHash, $Action, $PolPath, $IsDryRun)
             try {
                 $result = Invoke-LgpoApply -Scope "Machine" -PolPath $PolPath -DryRun:$IsDryRun

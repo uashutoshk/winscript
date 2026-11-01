@@ -80,7 +80,7 @@ function Get-DesktopCleanupTab {
 
         Write-Log "Applying Personalize policies..." "Info"
 
-        Start-BackgroundTask -Work {
+        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
             param($SyncHash, $IsDryRun)
             try {
                 $userPol = Get-PolicyPath -Module "personalize" -Action "enforce-user"
@@ -112,7 +112,7 @@ function Get-DesktopCleanupTab {
 
         Write-Log "Reverting Personalize policies..." "Info"
 
-        Start-BackgroundTask -Work {
+        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
             param($SyncHash, $IsDryRun)
             try {
                 $userPol = Get-PolicyPath -Module "personalize" -Action "revert-user"

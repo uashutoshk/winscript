@@ -18,19 +18,52 @@ function Global:Write-Log {
 }
 
 # Runs a scriptblock on a background runspace so the GUI never freezes.
-# lgpo-helpers.ps1 is dot-sourced inside the background runspace so that
-# Invoke-LgpoApply and Invoke-Gpupdate are available there.
+# Files listed in $DotSourceFiles are dot-sourced inside the background
+# runspace (after the param block) so helpers like Invoke-LgpoApply are
+# available to module -Work scriptblocks.
 function Global:Start-BackgroundTask {
     param(
         [Parameter(Mandatory)][scriptblock]$Work,
         [object[]]$ArgumentList = @(),
-        [scriptblock]$OnDone
+        [scriptblock]$OnDone,
+        [string[]]$DotSourceFiles = @()
     )
 
-    # Ensure LGPO helpers are available inside the background runspace
-    $helperPath = Join-Path $PSScriptRoot 'lgpo-helpers.ps1'
-    $workText = $Work.ToString()
-    $wrappedWork = [scriptblock]::Create(". `"$helperPath`"`n" + $workText)
+    # Build the work scriptblock. Insert DotSourceFiles after the param(...)
+    # block so param remains the first statement (PowerShell requirement).
+    $workStr = $Work.ToString()
+    if ($DotSourceFiles.Count -gt 0) {
+        $dotSourceCode = ($DotSourceFiles | ForEach-Object { ". `"$_`"" }) -join "`n"
+        $dotSourceCode += "`n"
+
+        # Find the end of the param(...) block
+        $paramKeywordIdx = $workStr.IndexOf('param')
+        if ($paramKeywordIdx -ge 0) {
+            $parenIdx = $workStr.IndexOf('(', $paramKeywordIdx)
+            if ($parenIdx -ge 0) {
+                $depth = 1
+                $i = $parenIdx + 1
+                while ($i -lt $workStr.Length -and $depth -gt 0) {
+                    $c = $workStr[$i]
+                    if ($c -eq '(') { $depth++ }
+                    elseif ($c -eq ')') { $depth-- }
+                    $i++
+                }
+                $paramEnd = $i
+                $wrappedStr = $workStr.Substring(0, $paramEnd) + "`n" + $dotSourceCode + $workStr.Substring($paramEnd)
+                $wrappedWork = [scriptblock]::Create($wrappedStr)
+            }
+            else {
+                $wrappedWork = $Work
+            }
+        }
+        else {
+            $wrappedWork = $Work
+        }
+    }
+    else {
+        $wrappedWork = $Work
+    }
 
     $ps = [powershell]::Create()
     $null = $ps.AddScript($wrappedWork).AddArgument($Global:SyncHash)
