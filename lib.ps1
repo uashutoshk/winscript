@@ -18,6 +18,8 @@ function Global:Write-Log {
 }
 
 # Runs a scriptblock on a background runspace so the GUI never freezes.
+# lgpo-helpers.ps1 is dot-sourced inside the background runspace so that
+# Invoke-LgpoApply and Invoke-Gpupdate are available there.
 function Global:Start-BackgroundTask {
     param(
         [Parameter(Mandatory)][scriptblock]$Work,
@@ -25,8 +27,13 @@ function Global:Start-BackgroundTask {
         [scriptblock]$OnDone
     )
 
+    # Ensure LGPO helpers are available inside the background runspace
+    $helperPath = Join-Path $PSScriptRoot 'lgpo-helpers.ps1'
+    $workText = $Work.ToString()
+    $wrappedWork = [scriptblock]::Create(". `"$helperPath`"`n" + $workText)
+
     $ps = [powershell]::Create()
-    $null = $ps.AddScript($Work).AddArgument($Global:SyncHash)
+    $null = $ps.AddScript($wrappedWork).AddArgument($Global:SyncHash)
     foreach ($extraArg in $ArgumentList) { $null = $ps.AddArgument($extraArg) }
 
     $rs = [runspacefactory]::CreateRunspace()
