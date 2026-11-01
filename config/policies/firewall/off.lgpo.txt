@@ -1,0 +1,14 @@
+Computer
+Software\Policies\Microsoft\WindowsFirewall\DomainProfile
+EnableFirewall
+DWORD:0
+
+Computer
+Software\Policies\Microsoft\WindowsFirewall\PrivateProfile
+EnableFirewall
+DWORD:0
+
+Computer
+Software\Policies\Microsoft\WindowsFirewall\PublicProfile
+EnableFirewall
+DWORD:0

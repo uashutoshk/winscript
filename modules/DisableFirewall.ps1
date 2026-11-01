@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Network / Firewall module. Toggles Windows Firewall for Public and
-    Private profiles using Set-NetFirewallProfile.
+    Firewall module. Toggles Windows Firewall for Domain, Private, and Public
+    profiles via Group Policy using LGPO.exe (.pol files). Supports dry-run mode.
 #>
 
 function Get-FirewallTab {
@@ -12,9 +12,9 @@ function Get-FirewallTab {
     $panel.Margin = 10
 
     $warn = New-Object System.Windows.Controls.TextBlock
-    $warn.Text = "Turning the firewall off removes a layer of protection against network-based attacks on both profiles. Only do this on networks you trust, and re-enable it when you're done."
+    $warn.Text = "Disabling the firewall removes a layer of protection against network-based attacks. Only do this on trusted networks, and re-enable when done. Revert manually via gpedit.msc if needed."
     $warn.TextWrapping = 'Wrap'
-    $warn.Foreground = 'IndianRed'
+    $warn.Foreground = $Cat.Red
     $warn.FontWeight = 'Bold'
     $warn.Margin = "0,0,0,10"
     $panel.Children.Add($warn) | Out-Null
@@ -36,21 +36,28 @@ function Get-FirewallTab {
 
     $panel.Children.Add($statusRow) | Out-Null
 
+    $dryRunCheck = New-Object System.Windows.Controls.CheckBox
+    $dryRunCheck.Content = "Dry run (show what would change, do not apply)"
+    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.Margin = "0,0,0,10"
+    $panel.Children.Add($dryRunCheck) | Out-Null
+
     $updateStatusLabel = {
         try {
-            $profiles = Get-NetFirewallProfile -Profile Public, Private -ErrorAction Stop
+            $profiles = Get-NetFirewallProfile -Profile Domain, Private, Public -ErrorAction Stop
             $lines = foreach ($p in $profiles) { "$($p.Name): $(if ($p.Enabled) { 'ON' } else { 'OFF' })" }
             $statusText.Text = "Current state -- " + ($lines -join "   |   ")
-            if ($profiles | Where-Object { -not $_.Enabled }) {
-                $statusText.Foreground = 'IndianRed'
+            $allOn = $profiles | Where-Object { -not $_.Enabled }
+            if ($allOn) {
+                $statusText.Foreground = $Cat.Red
             }
             else {
-                $statusText.Foreground = 'LightGreen'
+                $statusText.Foreground = $Cat.Green
             }
         }
         catch {
             $statusText.Text = "Could not read firewall state: $($_.Exception.Message)"
-            $statusText.Foreground = 'Gray'
+            $statusText.Foreground = $Cat.Subtext0
         }
     }.GetNewClosure()
 
@@ -61,55 +68,58 @@ function Get-FirewallTab {
     $btnRow.Orientation = 'Horizontal'
 
     $btnDisable = New-Object System.Windows.Controls.Button
-    $btnDisable.Content = "Turn Off Firewall (Public + Private)"
+    $btnDisable.Content = "Turn Off Firewall (All Profiles)"
 
     $btnEnable = New-Object System.Windows.Controls.Button
-    $btnEnable.Content = "Turn On Firewall (Public + Private)"
+    $btnEnable.Content = "Turn On Firewall (All Profiles)"
 
     $btnRow.Children.Add($btnDisable) | Out-Null
     $btnRow.Children.Add($btnEnable) | Out-Null
     $panel.Children.Add($btnRow) | Out-Null
 
-    $btnDisable.Add_Click({
-        $confirmMsg = "This will completely disable Windows Firewall for both the Public and Private network profiles. Continue?"
-        $result = [System.Windows.MessageBox]::Show($confirmMsg, "Confirm Firewall Change", 'YesNo', 'Warning')
-        if ($result -ne 'Yes') { return }
+    $applyFirewallPolicy = {
+        param($Action, $IsDryRun)
+        $btnDisable.IsEnabled = $false
+        $btnEnable.IsEnabled = $false
+        $btnRefresh.IsEnabled = $false
 
-        $btnDisable.IsEnabled = $false; $btnEnable.IsEnabled = $false; $btnRefresh.IsEnabled = $false
-        Write-Log "Disabling firewall for Public and Private profiles..."
+        $moduleName = "firewall"
+        $polPath = Get-PolicyPath -Module $moduleName -Action $Action
+
+        Write-Log "Applying Firewall policy: $Action" "Info"
 
         Start-BackgroundTask -Work {
-            param($SyncHash)
+            param($SyncHash, $Action, $PolPath, $IsDryRun)
             try {
-                Set-NetFirewallProfile -Profile Public, Private -Enabled False -ErrorAction Stop
-                $SyncHash.LogQueue.Enqueue("Firewall disabled for Public and Private profiles.")
+                $result = Invoke-LgpoApply -Scope "Machine" -PolPath $PolPath -DryRun:$IsDryRun
+                if (-not $IsDryRun -and $result) {
+                    Invoke-Gpupdate -DryRun:$IsDryRun
+                }
             }
             catch {
-                $SyncHash.LogQueue.Enqueue("[ERROR] Failed to disable firewall: $($_.Exception.Message)")
+                $SyncHash.LogQueue.Enqueue("[ERROR] Firewall policy $Action failed: $($_.Exception.Message)")
             }
         } -OnDone {
             & $updateStatusLabel
-            $btnDisable.IsEnabled = $true; $btnEnable.IsEnabled = $true; $btnRefresh.IsEnabled = $true
-        }
+            $btnDisable.IsEnabled = $true
+            $btnEnable.IsEnabled = $true
+            $btnRefresh.IsEnabled = $true
+        }.GetNewClosure()
+    }.GetNewClosure()
+
+    $btnDisable.Add_Click({
+        $confirmMsg = "This will completely disable Windows Firewall for Domain, Private, and Public network profiles. Continue?"
+        $result = [System.Windows.MessageBox]::Show($confirmMsg, "Confirm Firewall Change", 'YesNo', 'Warning')
+        if ($result -ne 'Yes') { return }
+        $isDryRun = [bool]$dryRunCheck.IsChecked
+        & $applyFirewallPolicy "off" $isDryRun
     }.GetNewClosure())
 
     $btnEnable.Add_Click({
         $btnDisable.IsEnabled = $false; $btnEnable.IsEnabled = $false; $btnRefresh.IsEnabled = $false
-        Write-Log "Enabling firewall for Public and Private profiles..."
-
-        Start-BackgroundTask -Work {
-            param($SyncHash)
-            try {
-                Set-NetFirewallProfile -Profile Public, Private -Enabled True -ErrorAction Stop
-                $SyncHash.LogQueue.Enqueue("Firewall enabled for Public and Private profiles.")
-            }
-            catch {
-                $SyncHash.LogQueue.Enqueue("[ERROR] Failed to enable firewall: $($_.Exception.Message)")
-            }
-        } -OnDone {
-            & $updateStatusLabel
-            $btnDisable.IsEnabled = $true; $btnEnable.IsEnabled = $true; $btnRefresh.IsEnabled = $true
-        }
+        Write-Log "Enabling firewall for all profiles..."
+        $isDryRun = [bool]$dryRunCheck.IsChecked
+        & $applyFirewallPolicy "on" $isDryRun
     }.GetNewClosure())
 
     $tab.Content = $panel

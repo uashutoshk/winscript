@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    Accounts / EnableDefaultAdmin module.
-    Enables built-in Administrator, sets password, and adjusts current user membership.
+    Local Accounts module. Enables the built-in Administrator, sets its password,
+    and adjusts current user group membership. Uses local user cmdlets (not
+    registry edits). Supports dry-run mode.
 #>
 
 function Get-EnableDefaultAdminTab {
@@ -45,15 +46,15 @@ function Get-EnableDefaultAdminTab {
             $userRole = if ($isAdmin) { "Administrator" } else { "Standard User" }
             $statusText.Text = "Administrator Account: $adminStatus   |   Current User ($currUser): $userRole"
             if ($adminUser.Enabled) {
-                $statusText.Foreground = 'LightGreen'
+                $statusText.Foreground = $Cat.Green
             }
             else {
-                $statusText.Foreground = 'IndianRed'
+                $statusText.Foreground = $Cat.Red
             }
         }
         catch {
             $statusText.Text = "Could not query account status: $($_.Exception.Message)"
-            $statusText.Foreground = 'Gray'
+            $statusText.Foreground = $Cat.Subtext0
         }
     }.GetNewClosure()
 
@@ -63,7 +64,7 @@ function Get-EnableDefaultAdminTab {
     $warn = New-Object System.Windows.Controls.TextBlock
     $warn.Text = "This enables the built-in Administrator account, sets its password, then removes the CURRENT user ($([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)) from the Administrators group and adds it to Users. Make sure you will remember the Administrator password -- it becomes your only local admin account after this runs."
     $warn.TextWrapping = 'Wrap'
-    $warn.Foreground = 'IndianRed'
+    $warn.Foreground = $Cat.Red
     $warn.FontWeight = 'Bold'
     $warn.Margin = "0,0,0,14"
     $panel.Children.Add($warn) | Out-Null
@@ -90,16 +91,22 @@ function Get-EnableDefaultAdminTab {
 
     $reqText = New-Object System.Windows.Controls.TextBlock
     $reqText.Text = "Minimum 8 characters, and at least 3 of: uppercase, lowercase, digit, symbol."
-    $reqText.Foreground = 'Gray'
+    $reqText.Foreground = $Cat.Subtext0
     $reqText.FontSize = 11
     $reqText.Margin = "0,0,0,10"
     $panel.Children.Add($reqText) | Out-Null
 
     $validationText = New-Object System.Windows.Controls.TextBlock
-    $validationText.Foreground = 'IndianRed'
+    $validationText.Foreground = $Cat.Red
     $validationText.TextWrapping = 'Wrap'
     $validationText.Margin = "0,0,0,10"
     $panel.Children.Add($validationText) | Out-Null
+
+    $dryRunCheck = New-Object System.Windows.Controls.CheckBox
+    $dryRunCheck.Content = "Dry run (show what would change, do not apply)"
+    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.Margin = "0,0,0,10"
+    $panel.Children.Add($dryRunCheck) | Out-Null
 
     $btnApply = New-Object System.Windows.Controls.Button
     $btnApply.Content = "Enable Administrator, Set Password, and Demote Current User"
@@ -134,13 +141,19 @@ function Get-EnableDefaultAdminTab {
         }
 
         $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $isDryRun = [bool]$dryRunCheck.IsChecked
 
         $confirmMsg = "This will:`n`n1. Enable the built-in Administrator account`n2. Set its password`n3. Remove '$currentUser' from Administrators`n4. Add '$currentUser' to Users`n`nYou will need to sign out and back in (or restart) for the group change to apply. Continue?"
-        $result = [System.Windows.MessageBox]::Show($confirmMsg, "Confirm Account Changes", 'YesNo', 'Warning')
-        if ($result -ne 'Yes') {
-            $validationText.Text = "Cancelled."
-            $pwBox.Password = ""; $pwBox2.Password = ""
-            return
+        if (-not $isDryRun) {
+            $result = [System.Windows.MessageBox]::Show($confirmMsg, "Confirm Account Changes", 'YesNo', 'Warning')
+            if ($result -ne 'Yes') {
+                $validationText.Text = "Cancelled."
+                $pwBox.Password = ""; $pwBox2.Password = ""
+                return
+            }
+        }
+        else {
+            Write-Log "DRY RUN: Would apply account changes for user '$currentUser'" "Info"
         }
 
         $securePw = ConvertTo-SecureString -String $pw1 -AsPlainText -Force
@@ -148,25 +161,35 @@ function Get-EnableDefaultAdminTab {
         $pw1 = $null; $pw2 = $null
 
         $btnApply.IsEnabled = $false; $btnRefresh.IsEnabled = $false
-        Write-Log "Starting local account changes for user '$currentUser'..."
+        Write-Log "Starting local account changes for user '$currentUser'..." "Info"
 
-        Start-BackgroundTask -ArgumentList @($securePw, $currentUser) -Work {
-            param($SyncHash, [SecureString] $SecurePassword, $CurrentUser)
+        Start-BackgroundTask -ArgumentList @($securePw, $currentUser, $isDryRun) -Work {
+            param($SyncHash, [SecureString] $SecurePassword, $CurrentUser, $IsDryRun)
 
             $adminAccountReady = $false
 
             try {
                 $admin = Get-LocalUser -Name "Administrator" -ErrorAction Stop
                 if (-not $admin.Enabled) {
-                    Enable-LocalUser -Name "Administrator" -ErrorAction Stop
-                    $SyncHash.LogQueue.Enqueue("Administrator account enabled.")
+                    if ($IsDryRun) {
+                        $SyncHash.LogQueue.Enqueue("[DRY-RUN] Would enable Administrator account.")
+                    }
+                    else {
+                        Enable-LocalUser -Name "Administrator" -ErrorAction Stop
+                        $SyncHash.LogQueue.Enqueue("Administrator account enabled.")
+                    }
                 }
                 else {
                     $SyncHash.LogQueue.Enqueue("Administrator account was already enabled.")
                 }
 
-                Set-LocalUser -Name "Administrator" -Password $SecurePassword -ErrorAction Stop
-                $SyncHash.LogQueue.Enqueue("Administrator password set.")
+                if (-not $IsDryRun) {
+                    Set-LocalUser -Name "Administrator" -Password $SecurePassword -ErrorAction Stop
+                    $SyncHash.LogQueue.Enqueue("Administrator password set.")
+                }
+                else {
+                    $SyncHash.LogQueue.Enqueue("[DRY-RUN] Would set Administrator password.")
+                }
 
                 $verify = Get-LocalUser -Name "Administrator" -ErrorAction Stop
                 if ($verify.Enabled) {
@@ -182,17 +205,20 @@ function Get-EnableDefaultAdminTab {
                 $SyncHash.LogQueue.Enqueue("Aborting -- current user's group membership was NOT changed.")
             }
 
-            if (-not $adminAccountReady) {
-                return
-            }
+            if (-not $adminAccountReady) { return }
 
             try {
                 $adminGroup = Get-LocalGroup -SID "S-1-5-32-544" -ErrorAction Stop
                 $usersGroup = Get-LocalGroup -SID "S-1-5-32-545" -ErrorAction Stop
 
                 try {
-                    Add-LocalGroupMember -SID $usersGroup.SID -Member $CurrentUser -ErrorAction Stop
-                    $SyncHash.LogQueue.Enqueue("Added '$CurrentUser' to $($usersGroup.Name).")
+                    if ($IsDryRun) {
+                        $SyncHash.LogQueue.Enqueue("[DRY-RUN] Would add '$CurrentUser' to $($usersGroup.Name).")
+                    }
+                    else {
+                        Add-LocalGroupMember -SID $usersGroup.SID -Member $CurrentUser -ErrorAction Stop
+                        $SyncHash.LogQueue.Enqueue("Added '$CurrentUser' to $($usersGroup.Name).")
+                    }
                 }
                 catch {
                     if ($_.Exception.Message -match "already a member") {
@@ -204,9 +230,14 @@ function Get-EnableDefaultAdminTab {
                 }
 
                 try {
-                    Remove-LocalGroupMember -SID $adminGroup.SID -Member $CurrentUser -ErrorAction Stop
-                    $SyncHash.LogQueue.Enqueue("Removed '$CurrentUser' from $($adminGroup.Name).")
-                    $SyncHash.LogQueue.Enqueue("Done. Sign out and back in (or restart) for the change to take effect.")
+                    if ($IsDryRun) {
+                        $SyncHash.LogQueue.Enqueue("[DRY-RUN] Would remove '$CurrentUser' from $($adminGroup.Name).")
+                    }
+                    else {
+                        Remove-LocalGroupMember -SID $adminGroup.SID -Member $CurrentUser -ErrorAction Stop
+                        $SyncHash.LogQueue.Enqueue("Removed '$CurrentUser' from $($adminGroup.Name).")
+                        $SyncHash.LogQueue.Enqueue("Done. Sign out and back in (or restart) for the change to take effect.")
+                    }
                 }
                 catch {
                     $SyncHash.LogQueue.Enqueue("[ERROR] Failed to remove '$CurrentUser' from Administrators: $($_.Exception.Message)")

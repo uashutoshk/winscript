@@ -1,16 +1,8 @@
 <#
 .SYNOPSIS
-    Debloat module. Defines Get-DebloatTab, called by main.ps1 after this
-    file is downloaded and Invoke-Expression'd.
-
-    Contract for every module in this repo:
-      - Expose one function (registered in manifest.json) that takes no
-        parameters and returns a fully-built [System.Windows.Controls.TabItem].
-      - Use the global Write-Log function for simple one-line log messages.
-      - Use Start-BackgroundTask for anything that touches the filesystem,
-        registry, or network so the GUI thread never blocks. Background
-        scriptblocks run in a separate runspace: log via
-        $SyncHash.LogQueue.Enqueue("text"), not Write-Log.
+    Debloat module. Removes selected in-box Windows apps.
+    App removal is not a Group Policy setting, so this uses Remove-AppxPackage.
+    Supports dry-run mode.
 #>
 
 function Get-DebloatTab {
@@ -22,6 +14,12 @@ function Get-DebloatTab {
 
     $mainPanel = New-Object System.Windows.Controls.StackPanel
     $mainPanel.Margin = 10
+
+    $desc = New-Object System.Windows.Controls.TextBlock
+    $desc.Text = "Remove unwanted pre-installed Windows apps (AppX packages)."
+    $desc.TextWrapping = 'Wrap'
+    $desc.Margin = "0,0,0,10"
+    $mainPanel.Children.Add($desc) | Out-Null
 
     # --- Toolbar: Select All / Select None ---------------------------------
     $toolbar = New-Object System.Windows.Controls.StackPanel
@@ -42,7 +40,14 @@ function Get-DebloatTab {
     $restoreCheck.Margin = "4,10,4,10"
     $mainPanel.Children.Add($restoreCheck) | Out-Null
 
-    # --- App checklist, loaded from config/debloat-list.json ---------------
+    # --- Dry run toggle ------------------------------------------------------
+    $dryRunCheck = New-Object System.Windows.Controls.CheckBox
+    $dryRunCheck.Content = "Dry run (show what would be removed, do not change anything)"
+    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.Margin = "4,4,4,10"
+    $mainPanel.Children.Add($dryRunCheck) | Out-Null
+
+    # --- App checklist, loaded from config/debloat-list.json -----------------
     $appCheckboxes = New-Object System.Collections.Generic.List[object]
 
     try {
@@ -80,13 +85,17 @@ function Get-DebloatTab {
         }
 
         $makeRestorePoint = [bool]$restoreCheck.IsChecked
+        $isDryRun = [bool]$dryRunCheck.IsChecked
         $btnRemove.IsEnabled = $false
-        Write-Log "Removing $($selected.Count) app(s)..."
+        Write-Log "$([string]::Join(", ", $selected))" "Info"
+        if ($isDryRun) {
+            Write-Log "DRY RUN enabled -- no changes will be made." "Info"
+        }
 
-        Start-BackgroundTask -ArgumentList @($selected, $makeRestorePoint) -Work {
-            param($SyncHash, $Packages, $MakeRestorePoint)
+        Start-BackgroundTask -ArgumentList @($selected, $makeRestorePoint, $isDryRun) -Work {
+            param($SyncHash, $Packages, $MakeRestorePoint, $IsDryRun)
 
-            if ($MakeRestorePoint) {
+            if ($MakeRestorePoint -and -not $IsDryRun) {
                 try {
                     $SyncHash.LogQueue.Enqueue("Creating system restore point...")
                     Enable-ComputerRestore -Drive "$env:SystemDrive\" -ErrorAction SilentlyContinue
@@ -102,26 +111,38 @@ function Get-DebloatTab {
                 try {
                     $installed = Get-AppxPackage -AllUsers -Name $pkg -ErrorAction SilentlyContinue
                     if ($installed) {
-                        $installed | Remove-AppxPackage -AllUsers -ErrorAction Stop
-                        $SyncHash.LogQueue.Enqueue("Removed: $pkg")
+                        if ($IsDryRun) {
+                            $SyncHash.LogQueue.Enqueue("[DRY-RUN] Would remove: $pkg")
+                        }
+                        else {
+                            $installed | Remove-AppxPackage -AllUsers -ErrorAction Stop
+                            $SyncHash.LogQueue.Enqueue("Removed: $pkg")
+                        }
+
+                        # Also remove the provisioned package so it doesn't come back for new user profiles
+                        if (-not $IsDryRun) {
+                            Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+                                Where-Object { $_.DisplayName -eq $pkg } |
+                                ForEach-Object {
+                                    Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null
+                                }
+                        }
                     }
                     else {
                         $SyncHash.LogQueue.Enqueue("Not installed, skipping: $pkg")
                     }
-
-                    # Also remove the provisioned package so it doesn't come back for new user profiles
-                    Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-                        Where-Object { $_.DisplayName -eq $pkg } |
-                        ForEach-Object {
-                            Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null
-                        }
                 }
                 catch {
                     $SyncHash.LogQueue.Enqueue("[ERROR] Failed to remove $pkg`: $($_.Exception.Message)")
                 }
             }
 
-            $SyncHash.LogQueue.Enqueue("Debloat run finished.")
+            if ($IsDryRun) {
+                $SyncHash.LogQueue.Enqueue("DRY RUN finished. No changes were made.")
+            }
+            else {
+                $SyncHash.LogQueue.Enqueue("Debloat run finished.")
+            }
         } -OnDone {
             $btnRemove.IsEnabled = $true
         }.GetNewClosure()

@@ -1,0 +1,14 @@
+User
+Software\Microsoft\Windows\CurrentVersion\Policies\System
+Wallpaper
+SZ:C:\Windows\Web\Wallpaper\nmc-bg.jpg
+
+User
+Software\Microsoft\Windows\CurrentVersion\Policies\System
+WallpaperStyle
+DWORD:10
+
+User
+Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop
+NoChangingWallPaper
+DWORD:1

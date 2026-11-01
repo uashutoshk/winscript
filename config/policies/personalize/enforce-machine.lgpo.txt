@@ -1,0 +1,9 @@
+Computer
+Software\Policies\Microsoft\Windows\Personalization
+NoChangingLockScreen
+DWORD:1
+
+Computer
+Software\Policies\Microsoft\Windows\Personalization
+LockScreenImage
+SZ:C:\Windows\Web\Wallpaper\nmc-bg.jpg

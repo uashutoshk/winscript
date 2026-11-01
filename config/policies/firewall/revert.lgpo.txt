@@ -1,0 +1,14 @@
+Computer
+Software\Policies\Microsoft\WindowsFirewall\DomainProfile
+EnableFirewall
+DELETE
+
+Computer
+Software\Policies\Microsoft\WindowsFirewall\PrivateProfile
+EnableFirewall
+DELETE
+
+Computer
+Software\Policies\Microsoft\WindowsFirewall\PublicProfile
+EnableFirewall
+DELETE

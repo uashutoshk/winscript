@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Permissions / DenyStorage module. Toggles USB and removable storage access
-    via Group Policy registry settings and system storage driver controls.
+    USB Storage module. Toggles removable storage access via Group Policy
+    using LGPO.exe (.pol files). Supports dry-run mode.
 #>
 
 function Get-DenyUsbStorageTab {
@@ -12,7 +12,7 @@ function Get-DenyUsbStorageTab {
     $panel.Margin = 10
 
     $desc = New-Object System.Windows.Controls.TextBlock
-    $desc.Text = "Blocks read/write access to all removable storage devices (USB drives, SD cards, etc.) via Group Policy and driver controls."
+    $desc.Text = "Blocks or allows read/write access to all removable storage devices (USB drives, SD cards, etc.) via Group Policy (Removable Storage Devices: Deny All)."
     $desc.TextWrapping = 'Wrap'
     $desc.Margin = "0,0,0,10"
     $panel.Children.Add($desc) | Out-Null
@@ -34,48 +34,28 @@ function Get-DenyUsbStorageTab {
 
     $panel.Children.Add($statusRow) | Out-Null
 
+    $dryRunCheck = New-Object System.Windows.Controls.CheckBox
+    $dryRunCheck.Content = "Dry run (show what would change, do not apply)"
+    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.Margin = "0,0,0,10"
+    $panel.Children.Add($dryRunCheck) | Out-Null
+
     $updateStatusLabel = {
         $isBlocked = $false
 
+        # Check LGPO / registry state for Deny_All
         if (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices") {
-            $hklmDeny = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices" -Name "Deny_All" -ErrorAction SilentlyContinue).Deny_All
-            if ($hklmDeny -eq 1) {
-                $isBlocked = $true
-            }
-            $subkeys = Get-ChildItem -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices" -ErrorAction SilentlyContinue
-            foreach ($sk in $subkeys) {
-                $p = Get-ItemProperty -Path $sk.PSPath -ErrorAction SilentlyContinue
-                if ($p.Deny_All -eq 1 -or $p.Deny_Read -eq 1 -or $p.Deny_Write -eq 1 -or $p.Deny_Execute -eq 1) {
-                    $isBlocked = $true
-                    break
-                }
-            }
-        }
-
-        if (Test-Path "HKCU:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices") {
-            $hkcuDeny = (Get-ItemProperty -Path "HKCU:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices" -Name "Deny_All" -ErrorAction SilentlyContinue).Deny_All
-            if ($hkcuDeny -eq 1) {
-                $isBlocked = $true
-            }
-        }
-
-        $usbstor = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR" -Name "Start" -ErrorAction SilentlyContinue).Start
-        if ($usbstor -eq 4) {
-            $isBlocked = $true
-        }
-
-        $sdp = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\StorageDevicePolicies" -Name "WriteProtect" -ErrorAction SilentlyContinue).WriteProtect
-        if ($sdp -eq 1) {
-            $isBlocked = $true
+            $val = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices" -Name "Deny_All" -ErrorAction SilentlyContinue).Deny_All
+            if ($val -eq 1) { $isBlocked = $true }
         }
 
         if ($isBlocked) {
             $statusText.Text = "Current state: BLOCKED"
-            $statusText.Foreground = 'IndianRed'
+            $statusText.Foreground = $Cat.Red
         }
         else {
             $statusText.Text = "Current state: ALLOWED"
-            $statusText.Foreground = 'LightGreen'
+            $statusText.Foreground = $Cat.Green
         }
     }.GetNewClosure()
 
@@ -96,81 +76,50 @@ function Get-DenyUsbStorageTab {
     $panel.Children.Add($btnRow) | Out-Null
 
     $note = New-Object System.Windows.Controls.TextBlock
-    $note.Text = "Devices already plugged in may need to be unplugged/replugged, or the machine restarted, for the change to fully take effect."
+    $note.Text = "Devices already plugged in may need to be unplugged/replugged, or the machine restarted, for the change to fully take effect. Revert manually via gpedit.msc if needed."
     $note.TextWrapping = 'Wrap'
-    $note.Foreground = 'Gray'
+    $note.Foreground = $Cat.Subtext0
     $note.Margin = "0,10,0,0"
     $panel.Children.Add($note) | Out-Null
 
-    $btnBlock.Add_Click({
-        $btnBlock.IsEnabled = $false; $btnAllow.IsEnabled = $false; $btnRefresh.IsEnabled = $false
-        Write-Log "Blocking USB storage access..."
+    $applyUsbPolicy = {
+        param($Action, $IsDryRun)
+        $btnBlock.IsEnabled = $false
+        $btnAllow.IsEnabled = $false
+        $btnRefresh.IsEnabled = $false
+
+        $moduleName = "usb-storage"
+        $polPath = Get-PolicyPath -Module $moduleName -Action $Action
+
+        Write-Log "Applying USB Storage policy: $Action" "Info"
+
         Start-BackgroundTask -Work {
-            param($SyncHash)
+            param($SyncHash, $Action, $PolPath, $IsDryRun)
             try {
-                $policyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices"
-                if (-not (Test-Path $policyPath)) {
-                    New-Item -Path $policyPath -Force | Out-Null
+                $result = Invoke-LgpoApply -Scope "Machine" -PolPath $PolPath -DryRun:$IsDryRun
+                if (-not $IsDryRun -and $result) {
+                    Invoke-Gpupdate -DryRun:$IsDryRun
                 }
-                Set-ItemProperty -Path $policyPath -Name "Deny_All" -Value 1 -Type DWord
-
-                if (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR") {
-                    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR" -Name "Start" -Value 4 -Type DWord -ErrorAction SilentlyContinue
-                }
-
-                gpupdate /target:computer /force | Out-Null
-                $SyncHash.LogQueue.Enqueue("USB storage access blocked.")
             }
             catch {
-                $SyncHash.LogQueue.Enqueue("[ERROR] Failed to block USB storage: $($_.Exception.Message)")
+                $SyncHash.LogQueue.Enqueue("[ERROR] USB policy $Action failed: $($_.Exception.Message)")
             }
         } -OnDone {
             & $updateStatusLabel
-            $btnBlock.IsEnabled = $true; $btnAllow.IsEnabled = $true; $btnRefresh.IsEnabled = $true
-        }
+            $btnBlock.IsEnabled = $true
+            $btnAllow.IsEnabled = $true
+            $btnRefresh.IsEnabled = $true
+        }.GetNewClosure()
+    }.GetNewClosure()
+
+    $btnBlock.Add_Click({
+        $isDryRun = [bool]$dryRunCheck.IsChecked
+        & $applyUsbPolicy "block" $isDryRun
     }.GetNewClosure())
 
     $btnAllow.Add_Click({
-        $btnBlock.IsEnabled = $false; $btnAllow.IsEnabled = $false; $btnRefresh.IsEnabled = $false
-        Write-Log "Allowing USB storage access..."
-        Start-BackgroundTask -Work {
-            param($SyncHash)
-            try {
-                $policyHklm = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices"
-                if (Test-Path $policyHklm) {
-                    Remove-ItemProperty -Path $policyHklm -Name "Deny_All" -ErrorAction SilentlyContinue
-                    Get-ChildItem -Path $policyHklm -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                }
-
-                $policyHkcu = "HKCU:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices"
-                if (Test-Path $policyHkcu) {
-                    Remove-ItemProperty -Path $policyHkcu -Name "Deny_All" -ErrorAction SilentlyContinue
-                    Get-ChildItem -Path $policyHkcu -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                }
-
-                if (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR") {
-                    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR" -Name "Start" -Value 3 -Type DWord -ErrorAction SilentlyContinue
-                }
-
-                if (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\UASPSTOR") {
-                    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\UASPSTOR" -Name "Start" -Value 3 -Type DWord -ErrorAction SilentlyContinue
-                }
-
-                $sdp = "HKLM:\SYSTEM\CurrentControlSet\Control\StorageDevicePolicies"
-                if (Test-Path $sdp) {
-                    Remove-ItemProperty -Path $sdp -Name "WriteProtect" -ErrorAction SilentlyContinue
-                }
-
-                gpupdate /target:computer /force | Out-Null
-                $SyncHash.LogQueue.Enqueue("USB storage access allowed.")
-            }
-            catch {
-                $SyncHash.LogQueue.Enqueue("[ERROR] Failed to allow USB storage: $($_.Exception.Message)")
-            }
-        } -OnDone {
-            & $updateStatusLabel
-            $btnBlock.IsEnabled = $true; $btnAllow.IsEnabled = $true; $btnRefresh.IsEnabled = $true
-        }
+        $isDryRun = [bool]$dryRunCheck.IsChecked
+        & $applyUsbPolicy "allow" $isDryRun
     }.GetNewClosure())
 
     $tab.Content = $panel

@@ -1,0 +1,9 @@
+Computer
+Software\Policies\Microsoft\Windows\Personalization
+NoChangingLockScreen
+DELETE
+
+Computer
+Software\Policies\Microsoft\Windows\Personalization
+LockScreenImage
+DELETE
