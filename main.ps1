@@ -60,54 +60,53 @@ function Global:Get-RepoJson {
 }
 
 # ---------------------------------------------------------------------------
-# Catppuccin Mocha colors (8-digit ARGB for XAML compatibility)
-# ---------------------------------------------------------------------------
-$Cat = @{
-    Base     = "#FF1e1e2e"
-    Mantle   = "#FF181825"
-    Crust    = "#FF11111b"
-    Surface0 = "#FF313244"
-    Surface1 = "#FF45475a"
-    Surface2 = "#FF585b70"
-    Overlay0 = "#FF6c7086"
-    Overlay1 = "#FF7f849c"
-    Overlay2 = "#FF9399b2"
-    Subtext0 = "#FFa6adc8"
-    Subtext1 = "#FFbac2de"
-    Text     = "#FFcdd6f4"
-    Rosewater= "#FFf5e0dc"
-    Flamingo = "#FFf2cdcd"
-    Pink     = "#FFf5c2e7"
-    Mauve    = "#FFcba6f7"
-    Red      = "#FFf38ba8"
-    Maroon   = "#FFeba0ac"
-    Peach    = "#FFfab387"
-    Yellow   = "#FFf9e2af"
-    Green    = "#FFa6e3a1"
-    Teal     = "#FF94e2d5"
-    Sky      = "#FF89dceb"
-    Sapphire = "#FF74c7ec"
-    Blue     = "#FF89b4fa"
-    Lavender = "#FFb4befe"
-}
-
-# ---------------------------------------------------------------------------
 # Window skeleton (XAML) -- Catppuccin Mocha theme
-# Colors use 8-digit ARGB (#AARRGGBB) directly in XAML attributes.
-# No PowerShell variable interpolation inside XAML to avoid markup-extension conflicts.
+# Colors defined as XAML resources (Color + SolidColorBrush) for maximum
+# compatibility with .NET Framework / PowerShell 5.1 WPF.
+# No PowerShell variable interpolation inside XAML.
 # ---------------------------------------------------------------------------
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="WinScript - NMC-IT" Height="600" Width="1000"
         WindowStartupLocation="CenterScreen"
-        Background="#FF1e1e2e">
+        Background="{StaticResource WindowBaseBrush}">
     <Window.Resources>
+        <!-- Catppuccin Mocha colors -->
+        <Color x:Key="ColorBase">#FF1e1e2e</Color>
+        <Color x:Key="ColorMantle">#FF181825</Color>
+        <Color x:Key="ColorCrust">#FF11111b</Color>
+        <Color x:Key="ColorSurface0">#FF313244</Color>
+        <Color x:Key="ColorSurface1">#FF45475a</Color>
+        <Color x:Key="ColorSurface2">#FF585b70</Color>
+        <Color x:Key="ColorOverlay0">#FF6c7086</Color>
+        <Color x:Key="ColorOverlay1">#FF7f849c</Color>
+        <Color x:Key="ColorOverlay2">#FF9399b2</Color>
+        <Color x:Key="ColorSubtext0">#FFa6adc8</Color>
+        <Color x:Key="ColorSubtext1">#FFbac2de</Color>
+        <Color x:Key="ColorText">#FFcdd6f4</Color>
+        <Color x:Key="ColorRed">#FFf38ba8</Color>
+        <Color x:Key="ColorGreen">#FFa6e3a1</Color>
+        <Color x:Key="ColorBlue">#FF89b4fa</Color>
+        <Color x:Key="ColorMauve">#FFcba6f7</Color>
+
+        <SolidColorBrush x:Key="WindowBaseBrush" Color="{StaticResource ColorBase}"/>
+        <SolidColorBrush x:Key="WindowMantleBrush" Color="{StaticResource ColorMantle}"/>
+        <SolidColorBrush x:Key="WindowSurface0Brush" Color="{StaticResource ColorSurface0}"/>
+        <SolidColorBrush x:Key="WindowSurface1Brush" Color="{StaticResource ColorSurface1}"/>
+        <SolidColorBrush x:Key="WindowSurface2Brush" Color="{StaticResource ColorSurface2}"/>
+        <SolidColorBrush x:Key="WindowTextBrush" Color="{StaticResource ColorText}"/>
+        <SolidColorBrush x:Key="WindowSubtext1Brush" Color="{StaticResource ColorSubtext1}"/>
+        <SolidColorBrush x:Key="WindowSubtext0Brush" Color="{StaticResource ColorSubtext0}"/>
+        <SolidColorBrush x:Key="WindowRedBrush" Color="{StaticResource ColorRed}"/>
+        <SolidColorBrush x:Key="WindowGreenBrush" Color="{StaticResource ColorGreen}"/>
+        <SolidColorBrush x:Key="WindowBlueBrush" Color="{StaticResource ColorBlue}"/>
+
         <Style TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Background" Value="#FF45475a"/>
-            <Setter Property="Foreground" Value="#FFcdd6f4"/>
-            <Setter Property="BorderBrush" Value="#FF585b70"/>
+            <Setter Property="Background" Value="{StaticResource WindowSurface1Brush}"/>
+            <Setter Property="Foreground" Value="{StaticResource WindowTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource WindowSurface2Brush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="Margin" Value="6"/>
@@ -125,19 +124,19 @@ $Cat = @{
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF585b70"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF89b4fa"/>
-                                <Setter Property="Foreground" Value="#FFcdd6f4"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WindowSurface2Brush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WindowBlueBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource WindowTextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF89b4fa"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF89b4fa"/>
-                                <Setter Property="Foreground" Value="#FF11111b"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WindowBlueBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WindowBlueBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource ColorCrust}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF181825"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF313244"/>
-                                <Setter Property="Foreground" Value="#FF6c7086"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WindowMantleBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WindowSurface0Brush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource WindowSubtext0Brush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -145,14 +144,14 @@ $Cat = @{
             </Setter>
         </Style>
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#FFcdd6f4"/>
+            <Setter Property="Foreground" Value="{StaticResource WindowTextBrush}"/>
             <Setter Property="Margin" Value="6"/>
         </Style>
         <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#FFcdd6f4"/>
+            <Setter Property="Foreground" Value="{StaticResource WindowTextBrush}"/>
         </Style>
         <Style x:Key="SidebarTabItem" TargetType="TabItem">
-            <Setter Property="Foreground" Value="#FFbac2de"/>
+            <Setter Property="Foreground" Value="{StaticResource WindowSubtext1Brush}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="16,10"/>
             <Setter Property="Margin" Value="0,2"/>
@@ -165,11 +164,11 @@ $Cat = @{
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF313244"/>
-                                <Setter Property="Foreground" Value="#FFcdd6f4"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WindowSurface0Brush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource WindowTextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF181825"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WindowMantleBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -186,12 +185,12 @@ $Cat = @{
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="#FF181825" CornerRadius="10" BorderBrush="#FF313244" BorderThickness="1" Padding="10">
+                            <Border Grid.Column="0" Background="{StaticResource WindowMantleBrush}" CornerRadius="10" BorderBrush="{StaticResource WindowSurface0Brush}" BorderThickness="1" Padding="10">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <TabPanel IsItemsHost="True" Background="Transparent"/>
                                 </ScrollViewer>
                             </Border>
-                            <Border Grid.Column="2" Background="#FF1e1e2e" CornerRadius="10" BorderBrush="#FF313244" BorderThickness="1" Padding="20">
+                            <Border Grid.Column="2" Background="{StaticResource WindowBaseBrush}" CornerRadius="10" BorderBrush="{StaticResource WindowSurface0Brush}" BorderThickness="1" Padding="20">
                                 <ContentPresenter ContentSource="SelectedContent"/>
                             </Border>
                         </Grid>
@@ -208,23 +207,23 @@ $Cat = @{
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="#FF181825" Padding="14,18" BorderBrush="#FF313244" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Background="{StaticResource WindowMantleBrush}" Padding="14,18" BorderBrush="{StaticResource WindowSurface0Brush}" BorderThickness="0,0,0,1">
             <TextBlock Name="BannerText" FontFamily="Consolas" FontSize="12"
                        HorizontalAlignment="Center" TextAlignment="Center"/>
         </Border>
 
-        <TabControl Grid.Row="1" Name="TabControl" Background="#FF1e1e2e" Margin="10"
+        <TabControl Grid.Row="1" Name="TabControl" Background="{StaticResource WindowBaseBrush}" Margin="10"
                     ItemContainerStyle="{StaticResource SidebarTabItem}"/>
 
-        <StatusBar Grid.Row="2" Background="#FF181825">
+        <StatusBar Grid.Row="2" Background="{StaticResource WindowMantleBrush}">
             <StatusBarItem>
-                <TextBlock Name="StatusText" Text="Ready" Foreground="#FFbac2de"/>
+                <TextBlock Name="StatusText" Text="Ready" Foreground="{StaticResource WindowSubtext1Brush}"/>
             </StatusBarItem>
         </StatusBar>
 
-        <Border Grid.Row="3" Background="#FF181825" Padding="8" BorderBrush="#FF313244" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3" Background="{StaticResource WindowMantleBrush}" Padding="8" BorderBrush="{StaticResource WindowSurface0Brush}" BorderThickness="0,1,0,0">
             <TextBlock Text="Made with *love* by Ashutosh" FontStyle="Italic" FontSize="11"
-                       Foreground="#FF6c7086" HorizontalAlignment="Center"/>
+                       Foreground="{StaticResource WindowSubtext0Brush}" HorizontalAlignment="Center"/>
         </Border>
     </Grid>
 </Window>
