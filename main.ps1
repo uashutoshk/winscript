@@ -98,6 +98,12 @@ function Global:CatColor {
     [System.Windows.Media.Color]::FromRgb([byte]$parts[0], [byte]$parts[1], [byte]$parts[2])
 }
 
+# Brush lookup table for module use (SolidColorBrush objects)
+$Global:CatBrush = @{}
+foreach ($key in $Cat.Keys) {
+    $Global:CatBrush[$key] = New-Object System.Windows.Media.SolidColorBrush (CatColor $Cat[$key])
+}
+
 # ---------------------------------------------------------------------------
 # Window skeleton (XAML) -- Catppuccin Mocha theme
 # Colors use inline hex strings directly in XAML attributes (no variable

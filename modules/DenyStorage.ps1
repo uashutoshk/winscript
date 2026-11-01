@@ -51,11 +51,11 @@ function Get-DenyUsbStorageTab {
 
         if ($isBlocked) {
             $statusText.Text = "Current state: BLOCKED"
-            $statusText.Foreground = $Cat.Red
+            $statusText.Foreground = $Global:CatBrush.Red
         }
         else {
             $statusText.Text = "Current state: ALLOWED"
-            $statusText.Foreground = $Cat.Green
+            $statusText.Foreground = $Global:CatBrush.Green
         }
     }.GetNewClosure()
 
@@ -78,7 +78,7 @@ function Get-DenyUsbStorageTab {
     $note = New-Object System.Windows.Controls.TextBlock
     $note.Text = "Devices already plugged in may need to be unplugged/replugged, or the machine restarted, for the change to fully take effect. Revert manually via gpedit.msc if needed."
     $note.TextWrapping = 'Wrap'
-    $note.Foreground = $Cat.Subtext0
+    $note.Foreground = $Global:CatBrush.Subtext0
     $note.Margin = "0,10,0,0"
     $panel.Children.Add($note) | Out-Null
 

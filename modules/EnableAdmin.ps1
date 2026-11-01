@@ -46,15 +46,15 @@ function Get-EnableDefaultAdminTab {
             $userRole = if ($isAdmin) { "Administrator" } else { "Standard User" }
             $statusText.Text = "Administrator Account: $adminStatus   |   Current User ($currUser): $userRole"
             if ($adminUser.Enabled) {
-                $statusText.Foreground = $Cat.Green
+                $statusText.Foreground = $Global:CatBrush.Green
             }
             else {
-                $statusText.Foreground = $Cat.Red
+                $statusText.Foreground = $Global:CatBrush.Red
             }
         }
         catch {
             $statusText.Text = "Could not query account status: $($_.Exception.Message)"
-            $statusText.Foreground = $Cat.Subtext0
+            $statusText.Foreground = $Global:CatBrush.Subtext0
         }
     }.GetNewClosure()
 
@@ -64,7 +64,7 @@ function Get-EnableDefaultAdminTab {
     $warn = New-Object System.Windows.Controls.TextBlock
     $warn.Text = "This enables the built-in Administrator account, sets its password, then removes the CURRENT user ($([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)) from the Administrators group and adds it to Users. Make sure you will remember the Administrator password -- it becomes your only local admin account after this runs."
     $warn.TextWrapping = 'Wrap'
-    $warn.Foreground = $Cat.Red
+    $warn.Foreground = $Global:CatBrush.Red
     $warn.FontWeight = 'Bold'
     $warn.Margin = "0,0,0,14"
     $panel.Children.Add($warn) | Out-Null
@@ -91,13 +91,13 @@ function Get-EnableDefaultAdminTab {
 
     $reqText = New-Object System.Windows.Controls.TextBlock
     $reqText.Text = "Minimum 8 characters, and at least 3 of: uppercase, lowercase, digit, symbol."
-    $reqText.Foreground = $Cat.Subtext0
+    $reqText.Foreground = $Global:CatBrush.Subtext0
     $reqText.FontSize = 11
     $reqText.Margin = "0,0,0,10"
     $panel.Children.Add($reqText) | Out-Null
 
     $validationText = New-Object System.Windows.Controls.TextBlock
-    $validationText.Foreground = $Cat.Red
+    $validationText.Foreground = $Global:CatBrush.Red
     $validationText.TextWrapping = 'Wrap'
     $validationText.Margin = "0,0,0,10"
     $panel.Children.Add($validationText) | Out-Null

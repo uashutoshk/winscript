@@ -14,7 +14,7 @@ function Get-FirewallTab {
     $warn = New-Object System.Windows.Controls.TextBlock
     $warn.Text = "Disabling the firewall removes a layer of protection against network-based attacks. Only do this on trusted networks, and re-enable when done. Revert manually via gpedit.msc if needed."
     $warn.TextWrapping = 'Wrap'
-    $warn.Foreground = $Cat.Red
+    $warn.Foreground = $Global:CatBrush.Red
     $warn.FontWeight = 'Bold'
     $warn.Margin = "0,0,0,10"
     $panel.Children.Add($warn) | Out-Null
@@ -49,15 +49,15 @@ function Get-FirewallTab {
             $statusText.Text = "Current state -- " + ($lines -join "   |   ")
             $allOn = $profiles | Where-Object { -not $_.Enabled }
             if ($allOn) {
-                $statusText.Foreground = $Cat.Red
+                $statusText.Foreground = $Global:CatBrush.Red
             }
             else {
-                $statusText.Foreground = $Cat.Green
+                $statusText.Foreground = $Global:CatBrush.Green
             }
         }
         catch {
             $statusText.Text = "Could not read firewall state: $($_.Exception.Message)"
-            $statusText.Foreground = $Cat.Subtext0
+            $statusText.Foreground = $Global:CatBrush.Subtext0
         }
     }.GetNewClosure()
 

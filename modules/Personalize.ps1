@@ -47,11 +47,11 @@ function Get-DesktopCleanupTab {
 
         if ($noWall -eq 1 -or $noLock -eq 1 -or $wallPolicy) {
             $statusText.Text = "Current state: POLICIES ENFORCED (Wallpaper/Lock Screen Locked)"
-            $statusText.Foreground = $Cat.Red
+            $statusText.Foreground = $Global:CatBrush.Red
         }
         else {
             $statusText.Text = "Current state: ALLOWED (Customization Unrestricted)"
-            $statusText.Foreground = $Cat.Green
+            $statusText.Foreground = $Global:CatBrush.Green
         }
     }.GetNewClosure()
 
