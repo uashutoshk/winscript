@@ -13,7 +13,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, Sys
 . (Join-Path $PSScriptRoot 'lgpo-helpers.ps1')
 
 if (-not $Global:BaseRepoUrl) {
-    $Global:BaseRepoUrl = "https://raw.githubusercontent.com/asup20cs/winscript/main"
+    $Global:BaseRepoUrl = "https://raw.githubusercontent.com/uashutoshk/winscript/main"
 }
 
 # ---------------------------------------------------------------------------
