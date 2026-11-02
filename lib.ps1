@@ -18,44 +18,34 @@ function Global:Write-Log {
 }
 
 # Runs a scriptblock on a background runspace so the GUI never freezes.
-# Files listed in $DotSourceFiles are dot-sourced inside the background
-# runspace (after the param block) so helpers like Invoke-LgpoApply are
-# available to module -Work scriptblocks.
+# lgpo-helpers.ps1 is dot-sourced inside the background runspace (after the
+# param block) so Invoke-LgpoApply and Invoke-Gpupdate are available there.
 function Global:Start-BackgroundTask {
     param(
         [Parameter(Mandatory)][scriptblock]$Work,
         [object[]]$ArgumentList = @(),
-        [scriptblock]$OnDone,
-        [string[]]$DotSourceFiles = @()
+        [scriptblock]$OnDone
     )
 
-    # Build the work scriptblock. Insert DotSourceFiles after the param(...)
-    # block so param remains the first statement (PowerShell requirement).
-    $workStr = $Work.ToString()
-    if ($DotSourceFiles.Count -gt 0) {
-        $dotSourceCode = ($DotSourceFiles | ForEach-Object { ". `"$_`"" }) -join "`n"
-        $dotSourceCode += "`n"
+    $helperPath = Join-Path $PSScriptRoot 'lgpo-helpers.ps1'
 
-        # Find the end of the param(...) block
-        $paramKeywordIdx = $workStr.IndexOf('param')
-        if ($paramKeywordIdx -ge 0) {
-            $parenIdx = $workStr.IndexOf('(', $paramKeywordIdx)
-            if ($parenIdx -ge 0) {
-                $depth = 1
-                $i = $parenIdx + 1
-                while ($i -lt $workStr.Length -and $depth -gt 0) {
-                    $c = $workStr[$i]
-                    if ($c -eq '(') { $depth++ }
-                    elseif ($c -eq ')') { $depth-- }
-                    $i++
-                }
-                $paramEnd = $i
-                $wrappedStr = $workStr.Substring(0, $paramEnd) + "`n" + $dotSourceCode + $workStr.Substring($paramEnd)
-                $wrappedWork = [scriptblock]::Create($wrappedStr)
+    # Insert dot-source after param(...) block so param stays first statement
+    $workStr = $Work.ToString()
+    $paramKeywordIdx = $workStr.IndexOf('param')
+    if ($paramKeywordIdx -ge 0) {
+        $parenIdx = $workStr.IndexOf('(', $paramKeywordIdx)
+        if ($parenIdx -ge 0) {
+            $depth = 1
+            $i = $parenIdx + 1
+            while ($i -lt $workStr.Length -and $depth -gt 0) {
+                $c = $workStr[$i]
+                if ($c -eq '(') { $depth++ }
+                elseif ($c -eq ')') { $depth-- }
+                $i++
             }
-            else {
-                $wrappedWork = $Work
-            }
+            $paramEnd = $i
+            $wrappedStr = $workStr.Substring(0, $paramEnd) + "`n. `"$helperPath`"" + $workStr.Substring($paramEnd)
+            $wrappedWork = [scriptblock]::Create($wrappedStr)
         }
         else {
             $wrappedWork = $Work

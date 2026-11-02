@@ -43,7 +43,8 @@ function Get-DebloatTab {
     # --- Dry run toggle ------------------------------------------------------
     $dryRunCheck = New-Object System.Windows.Controls.CheckBox
     $dryRunCheck.Content = "Dry run (show what would be removed, do not change anything)"
-    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.IsChecked = $false
+    $dryRunCheck.Visibility = 'Collapsed'
     $dryRunCheck.Margin = "4,4,4,10"
     $mainPanel.Children.Add($dryRunCheck) | Out-Null
 

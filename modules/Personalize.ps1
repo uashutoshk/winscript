@@ -36,7 +36,8 @@ function Get-DesktopCleanupTab {
 
     $dryRunCheck = New-Object System.Windows.Controls.CheckBox
     $dryRunCheck.Content = "Dry run (show what would change, do not apply)"
-    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.IsChecked = $false
+    $dryRunCheck.Visibility = 'Collapsed'
     $dryRunCheck.Margin = "0,0,0,10"
     $panel.Children.Add($dryRunCheck) | Out-Null
 
@@ -80,7 +81,7 @@ function Get-DesktopCleanupTab {
 
         Write-Log "Applying Personalize policies..." "Info"
 
-        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
+        Start-BackgroundTask -Work {
             param($SyncHash, $IsDryRun)
             try {
                 $userPol = Get-PolicyPath -Module "personalize" -Action "enforce-user"
@@ -112,7 +113,7 @@ function Get-DesktopCleanupTab {
 
         Write-Log "Reverting Personalize policies..." "Info"
 
-        Start-BackgroundTask -DotSourceFiles @("$PSScriptRoot/lgpo-helpers.ps1") -Work {
+        Start-BackgroundTask -Work {
             param($SyncHash, $IsDryRun)
             try {
                 $userPol = Get-PolicyPath -Module "personalize" -Action "revert-user"

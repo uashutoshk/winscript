@@ -104,7 +104,8 @@ function Get-EnableDefaultAdminTab {
 
     $dryRunCheck = New-Object System.Windows.Controls.CheckBox
     $dryRunCheck.Content = "Dry run (show what would change, do not apply)"
-    $dryRunCheck.IsChecked = $true
+    $dryRunCheck.IsChecked = $false
+    $dryRunCheck.Visibility = 'Collapsed'
     $dryRunCheck.Margin = "0,0,0,10"
     $panel.Children.Add($dryRunCheck) | Out-Null
 
